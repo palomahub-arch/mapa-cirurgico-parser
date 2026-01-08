@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Mapa Cirúrgico</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="container">
+    <h1>Mapa Cirúrgico</h1>
+    <div class="subtitle">
+        Conversão de PDF para Excel
+    </div>
+
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="files" accept=".pdf" multiple required>
+        <button type="submit">Processar PDFs</button>
+    </form>
+
+    <div class="footer">
+        Desenvolvido por <span>Eduardo Shiroma</span> • Python & Data Engineering
+    </div>
+</div>
+
+</body>
+</html>
