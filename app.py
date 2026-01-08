@@ -1,85 +1,153 @@
+import logging
+from logger_config import configurar_logger
+configurar_logger()
+
 import sys
 sys.dont_write_bytecode = True
 
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import os
-import shutil
-from datetime import datetime
 
-from mapa_cirurgico import processar_pasta
+from mapa_cirurgico import processar_lista_pdfs
 
 
-def selecionar_pdfs():
-    arquivos = filedialog.askopenfilenames(
-        title="Selecione os PDFs do Mapa Cirúrgico",
-        filetypes=[("Arquivos PDF", "*.pdf")]
-    )
+class MapaCirurgicoApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Mapa Cirúrgico - PDF para Excel")
+        self.root.geometry("500x270")
+        self.root.resizable(False, False)
 
-    if not arquivos:
-        return
+        self.lista_pdfs = []
 
-    # Pasta Downloads do usuário
-    pasta_downloads = os.path.join(os.path.expanduser("~"), "Downloads")
+        # ===============================
+        # TÍTULO / INSTRUÇÃO
+        # ===============================
+        self.label_info = tk.Label(
+            root,
+            text="Selecione os arquivos PDF do mapa cirúrgico",
+            font=("Arial", 11)
+        )
+        self.label_info.pack(pady=15)
 
-    # Pasta temporária para os PDFs
-    pasta_temp = os.path.join(pasta_downloads, "pdfs_temp")
+        # ===============================
+        # BOTÃO SELEÇÃO
+        # ===============================
+        self.btn_selecionar = tk.Button(
+            root,
+            text="Selecionar PDFs",
+            width=25,
+            command=self.selecionar_pdfs
+        )
+        self.btn_selecionar.pack(pady=5)
 
-    try:
-        os.makedirs(pasta_temp, exist_ok=True)
+        # ===============================
+        # QUANTIDADE DE ARQUIVOS
+        # ===============================
+        self.label_qtd = tk.Label(
+            root,
+            text="Nenhum arquivo selecionado"
+        )
+        self.label_qtd.pack(pady=5)
 
-        # Copiar PDFs selecionados para a pasta temporária
-        for arq in arquivos:
-            shutil.copy(arq, pasta_temp)
+        # ===============================
+        # BOTÃO PROCESSAR
+        # ===============================
+        self.btn_processar = tk.Button(
+            root,
+            text="Processar",
+            width=25,
+            state=tk.DISABLED,
+            command=self.processar
+        )
+        self.btn_processar.pack(pady=10)
 
-        # Processar PDFs
-        processar_pasta(pasta_temp)
+        # ===============================
+        # STATUS (RODAPÉ)
+        # ===============================
+        self.status_var = tk.StringVar(value="🟡 Aguardando seleção de arquivos")
+        self.label_status = tk.Label(
+            root,
+            textvariable=self.status_var,
+            anchor="w",
+            relief=tk.SUNKEN,
+            padx=10
+        )
+        self.label_status.pack(side=tk.BOTTOM, fill=tk.X)
 
-        # Nome padronizado do Excel
-        data_hoje = datetime.now().strftime("%Y_%m_%d")
-        nome_excel = f"Mapa Cirúrgico {data_hoje}.xlsx"
-
-        excel_temp = os.path.join(pasta_temp, "Mapa Cirurgico.xlsx")
-        excel_final = os.path.join(pasta_downloads, nome_excel)
-
-        # Mover Excel para Downloads
-        if os.path.exists(excel_temp):
-            shutil.move(excel_temp, excel_final)
-        else:
-            raise FileNotFoundError("Arquivo Excel não foi gerado.")
-
-        messagebox.showinfo(
-            "Sucesso",
-            f"Mapa Cirúrgico gerado com sucesso!\n\n"
-            f"Arquivo salvo em:\n{excel_final}"
+    # =====================================================
+    # SELEÇÃO DE PDFs
+    # =====================================================
+    def selecionar_pdfs(self):
+        arquivos = filedialog.askopenfilenames(
+            title="Selecione os PDFs",
+            filetypes=[("Arquivos PDF", "*.pdf")]
         )
 
-    except Exception as e:
-        messagebox.showerror("Erro", str(e))
+        if arquivos:
+            self.lista_pdfs = list(arquivos)
+            self.label_qtd.config(
+                text=f"{len(self.lista_pdfs)} arquivo(s) selecionado(s)"
+            )
+            self.btn_processar.config(state=tk.NORMAL)
+            self.status_var.set("🟢 Arquivos selecionados com sucesso")
 
-    finally:
-        # Remove a pasta temporária
-        shutil.rmtree(pasta_temp, ignore_errors=True)
+    # =====================================================
+    # PROCESSAMENTO
+    # =====================================================
+    def processar(self):
+        if not self.lista_pdfs:
+            messagebox.showwarning(
+                "Atenção",
+                "Nenhum arquivo PDF foi selecionado."
+            )
+            return
+
+        try:
+            # UI - estado processando
+            self.status_var.set("🔵 Processando arquivos, aguarde...")
+            self.btn_processar.config(state=tk.DISABLED)
+            self.btn_selecionar.config(state=tk.DISABLED)
+            self.root.update_idletasks()
+
+            pasta_saida = os.path.join(os.path.expanduser("~"), "Downloads")
+
+            caminho, total = processar_lista_pdfs(
+                self.lista_pdfs,
+                pasta_saida
+            )
+
+            self.status_var.set("🟢 Processamento concluído com sucesso")
+
+            messagebox.showinfo(
+                "Sucesso",
+                f"Processamento concluído!\n\n"
+                f"Registros gerados: {total}\n"
+                f"Arquivo salvo em:\n{caminho}"
+            )
+
+        except Exception as e:
+            logging.exception("Erro durante o processamento")
+            self.status_var.set("🔴 Erro durante o processamento")
+
+            messagebox.showerror(
+                "Erro",
+                f"Ocorreu um erro durante o processamento:\n\n{str(e)}"
+            )
+
+        finally:
+            # UI - volta ao normal
+            self.btn_selecionar.config(state=tk.NORMAL)
+            self.btn_processar.config(
+                state=tk.NORMAL if self.lista_pdfs else tk.DISABLED
+            )
 
 
-# =========================
-# INTERFACE GRÁFICA
-# =========================
-
-root = tk.Tk()
-root.title("Gerador de Mapa Cirúrgico")
-root.geometry("420x180")
-root.resizable(False, False)
-
-btn = tk.Button(
-    root,
-    text="Selecionar PDFs e Gerar Excel",
-    font=("Arial", 12),
-    width=32,
-    height=3,
-    command=selecionar_pdfs
-)
-
-btn.pack(expand=True)
-
-root.mainloop()
+# =====================================================
+# EXECUÇÃO
+# =====================================================
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = MapaCirurgicoApp(root)
+    root.mainloop()
