@@ -239,21 +239,19 @@ def processar_pagina(pagina):
     return df[colunas_finais]
 
 # =====================================================
-# PROCESSAMENTO DA PASTA
+# PROCESSAMENTO DA LISTA DE PDFs
 # =====================================================
 
-def processar_pasta(pasta_pdfs):
-    arquivos = [
-        os.path.join(pasta_pdfs, f)
-        for f in os.listdir(pasta_pdfs)
-        if f.lower().endswith('.pdf')
-    ]
+def processar_lista_pdfs(lista_pdfs, pasta_saida):
+    import pandas as pd
+    from openpyxl import Workbook
+    from openpyxl.utils.dataframe import dataframe_to_rows
+    import os
 
     df_final = pd.DataFrame()
 
-    for pdf_path in arquivos:
+    for pdf_path in lista_pdfs:
         unidade = os.path.splitext(os.path.basename(pdf_path))[0]
-        print(f"\n📄 Processando: {unidade}")
 
         with pdfplumber.open(pdf_path) as pdf:
             data_extraida = extrai_data(pdf.pages[0])
@@ -268,10 +266,10 @@ def processar_pasta(pasta_pdfs):
                 df_aux['Escala'] = None
 
                 df_final = pd.concat([df_final, df_aux], ignore_index=True)
-    
-    colunas_proibidas = ['Paciente', 'Aviso Cirurgico']
+
+    # 🔥 Remoção definitiva de colunas proibidas
     df_final = df_final.drop(
-        columns=[c for c in colunas_proibidas if c in df_final.columns],
+        columns=[c for c in ['Paciente', 'Aviso Cirurgico'] if c in df_final.columns],
         errors='ignore'
     )
 
@@ -285,24 +283,18 @@ def processar_pasta(pasta_pdfs):
     ws.append(['Obrigatorio'] * 4 + ['Opcional'] * 5)
 
     colunas = [
-        'Data', 'Unidade', 'Escala', 'Local', 'Subatividade',
-        'Hora inicio', 'Duração (min)', 'Profissional (GH)',
-        'Agente externo'
+        'Data', 'Unidade', 'Escala', 'Local',
+        'Subatividade', 'Hora inicio', 'Duração (min)',
+        'Profissional (GH)', 'Agente externo'
     ]
     ws.append(colunas)
 
     for r in dataframe_to_rows(df_final[colunas], index=False, header=False):
         ws.append(r)
 
-    caminho = os.path.join(pasta_pdfs, 'Mapa Cirurgico.xlsx')
+    caminho = os.path.join(pasta_saida, 'Mapa Cirurgico.xlsx')
     wb.save(caminho)
 
-    print(f"\n✅ Excel gerado com sucesso: {caminho}")
-    print(f"✅ Total de registros: {len(df_final)}")
+    return caminho, len(df_final)
 
-# =====================================================
-# EXECUÇÃO
-# =====================================================
 
-# pasta_com_pdfs = r"G:\Meu Drive\Projetos\8 - Mapa Cirúrgico\NF to xlsx"
-# processar_pasta(pasta_com_pdfs)
